@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
+
   const { prompt }: { prompt: string } = await request.json();
 
   const user = await prisma.user.findUnique({
@@ -32,18 +33,36 @@ export async function POST(request: NextRequest) {
     prompt
   )}?seed=${randomSeed}&width=512&height=512&nologo=True`;
 
-  await fetch(imageURL);
+  try {
+    // Fetch image generation result
+    const response = await fetch(imageURL);
 
-  await prisma.post.create({
-    data: {
-      prompt: prompt,
-      url: imageURL,
-      seed: randomSeed,
-      userId: user.id,
-    },
-  });
+    // Check if the response is successful
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: `Failed to generate image. Status: ${response.statusText}` },
+        { status: response.status }
+      );
+    }
 
-  return NextResponse.json({ url: imageURL });
+    await prisma.post.create({
+      data: {
+        prompt: prompt,
+        url: imageURL,
+        seed: randomSeed,
+        userId: user.id,
+      },
+    });
+
+    return NextResponse.json({ url: imageURL });
+  } catch (error) {
+    // Catch any other errors during fetch or processing
+    console.error("Error generating image:", error);
+    return NextResponse.json(
+      { error: "An unexpected error occurred while generating the image" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET() {
